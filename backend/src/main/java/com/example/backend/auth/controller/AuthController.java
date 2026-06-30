@@ -32,13 +32,14 @@ public class AuthController {
 
     @PostMapping("/signup")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String normalizedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
+        if (userRepository.existsByEmail(normalizedEmail)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already registered");
         }
 
         User user = new User();
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setCreatedAt(Instant.now());
 
@@ -50,15 +51,15 @@ public class AuthController {
                 "Bearer",
                 savedUser.getId(),
                 savedUser.getName(),
-                savedUser.getEmail()
-        );
+                savedUser.getEmail());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        String normalizedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
         }
@@ -69,8 +70,7 @@ public class AuthController {
                 "Bearer",
                 user.getId(),
                 user.getName(),
-                user.getEmail()
-        );
+                user.getEmail());
 
         return ResponseEntity.ok(response);
     }

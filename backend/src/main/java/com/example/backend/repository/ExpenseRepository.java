@@ -14,4 +14,6 @@ public interface ExpenseRepository extends MongoRepository<Expense, String> {
     List<Expense> findByGroupId(String groupId);
 
     Page<Expense> findByGroupIdOrderByCreatedAtDesc(String groupId, Pageable pageable);
+
+    void deleteByGroupId(String groupId);
 }

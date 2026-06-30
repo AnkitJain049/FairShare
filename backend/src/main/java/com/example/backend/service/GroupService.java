@@ -7,20 +7,22 @@ import org.springframework.stereotype.Service;
 
 import com.example.backend.auth.repository.UserRepository;
 import com.example.backend.model.Group;
-import com.example.backend.model.GroupType;
+import com.example.backend.repository.ExpenseRepository;
 import com.example.backend.repository.GroupRepository;
 
 @Service
 public class GroupService {
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final ExpenseRepository expenseRepository;
 
-    public GroupService(GroupRepository groupRepository, UserRepository userRepository) {
+    public GroupService(GroupRepository groupRepository, UserRepository userRepository, ExpenseRepository expenseRepository) {
         this.groupRepository = groupRepository;
         this.userRepository = userRepository;
+        this.expenseRepository = expenseRepository;
     }
 
-    public Group createGroup(String name, GroupType type, List<String> memberIds) {
+    public Group createGroup(String name, List<String> memberIds) {
         if (memberIds == null || memberIds.isEmpty()) {
             throw new IllegalArgumentException("A group must include at least one member");
         }
@@ -33,7 +35,6 @@ public class GroupService {
 
         Group group = Group.builder()
                 .name(name)
-                .type(type)
                 .memberIds(memberIds)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -48,5 +49,22 @@ public class GroupService {
 
     public List<Group> getUserGroups(String userId) {
         return groupRepository.findByMemberIdsContaining(userId);
+    }
+
+    public Group updateGroupName(String groupId, String name) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group not found with id: " + groupId));
+        group.setName(name);
+        return groupRepository.save(group);
+    }
+
+    public void deleteGroup(String groupId) {
+        if (!groupRepository.existsById(groupId)) {
+            throw new ResourceNotFoundException("Group not found with id: " + groupId);
+        }
+        // Delete all expenses belonging to this group
+        expenseRepository.deleteByGroupId(groupId);
+        // Delete the group itself
+        groupRepository.deleteById(groupId);
     }
 }

@@ -58,4 +58,41 @@ public class ExpenseService {
 
         return expenseRepository.save(expense);
     }
+
+    public Expense updateExpense(String expenseId, String description, BigDecimal totalAmount,
+                                 String paidById, SplitType splitType, List<Split> splitDetails) {
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found with id: " + expenseId));
+
+        Group group = groupRepository.findById(expense.getGroupId())
+                .orElseThrow(() -> new ResourceNotFoundException("Group not found with id: " + expense.getGroupId()));
+
+        if (!group.getMemberIds().contains(paidById)) {
+            throw new IllegalArgumentException("Paid by user does not belong to this group");
+        }
+
+        for (Split split : splitDetails) {
+            if (!group.getMemberIds().contains(split.getUserId())) {
+                throw new IllegalArgumentException("Split user does not belong to this group");
+            }
+        }
+
+        ISplitStrategy splitStrategy = splitStrategyFactory.resolve(splitType);
+        List<Split> processedSplits = splitStrategy.validateAndProcessSplits(totalAmount, splitDetails);
+
+        expense.setDescription(description);
+        expense.setTotalAmount(totalAmount);
+        expense.setPaidById(paidById);
+        expense.setSplitType(splitType);
+        expense.setSplitDetails(processedSplits);
+
+        return expenseRepository.save(expense);
+    }
+
+    public void deleteExpense(String expenseId) {
+        if (!expenseRepository.existsById(expenseId)) {
+            throw new ResourceNotFoundException("Expense not found with id: " + expenseId);
+        }
+        expenseRepository.deleteById(expenseId);
+    }
 }

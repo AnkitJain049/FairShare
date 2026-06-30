@@ -20,7 +20,6 @@ public class Group {
     @Id
     private String id;
     private String name;
-    private GroupType type;
     private List<String> memberIds;
     private LocalDateTime createdAt;
 }

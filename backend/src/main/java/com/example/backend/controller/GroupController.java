@@ -5,16 +5,17 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.backend.model.Group;
-import com.example.backend.model.GroupType;
 import com.example.backend.service.GroupService;
 
 @RestController
@@ -29,11 +30,9 @@ public class GroupController {
     @PostMapping
     public ResponseEntity<Group> createGroup(@RequestBody Map<String, Object> payload) {
         String name = (String) payload.get("name");
-        String typeValue = (String) payload.get("type");
         List<String> memberIds = (List<String>) payload.get("memberIds");
 
-        GroupType type = GroupType.valueOf(typeValue.toUpperCase());
-        Group createdGroup = groupService.createGroup(name, type, memberIds);
+        Group createdGroup = groupService.createGroup(name, memberIds);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdGroup);
     }
 
@@ -45,5 +44,18 @@ public class GroupController {
     @GetMapping
     public ResponseEntity<List<Group>> getUserGroups(@RequestParam String userId) {
         return ResponseEntity.ok(groupService.getUserGroups(userId));
+    }
+
+    @PutMapping("/{groupId}")
+    public ResponseEntity<Group> updateGroupName(@PathVariable String groupId, @RequestBody Map<String, Object> payload) {
+        String name = (String) payload.get("name");
+        Group updatedGroup = groupService.updateGroupName(groupId, name);
+        return ResponseEntity.ok(updatedGroup);
+    }
+
+    @DeleteMapping("/{groupId}")
+    public ResponseEntity<Void> deleteGroup(@PathVariable String groupId) {
+        groupService.deleteGroup(groupId);
+        return ResponseEntity.noContent().build();
     }
 }
