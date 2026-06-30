@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Wallet, LogIn, AlertCircle } from 'lucide-react';
+import { LogIn, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -30,7 +30,7 @@ export default function Login() {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-slate-800">
       <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center">
         <div className="flex items-center space-x-2 text-emerald-600">
-          <Wallet className="h-12 w-12 text-emerald-500" />
+          <img src="/favicon.svg" alt="FairShare Logo" className="h-12 w-12" />
           <span className="text-3xl font-extrabold tracking-tight text-slate-850">
             Fair<span className="text-emerald-600">Share</span>
           </span>

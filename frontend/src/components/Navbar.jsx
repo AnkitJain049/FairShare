@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, User as UserIcon, Wallet, LayoutDashboard } from 'lucide-react';
+import { LogOut, LayoutDashboard } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -18,7 +18,7 @@ export default function Navbar() {
           {/* Logo Section */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2 text-emerald-600 hover:text-emerald-500 transition-colors">
-              <Wallet className="h-8 w-8 text-emerald-500" />
+              <img src="/favicon.svg" alt="FairShare Logo" className="h-8 w-8" />
               <span className="text-xl font-bold tracking-tight text-slate-800">
                 Fair<span className="text-emerald-600">Share</span>
               </span>
