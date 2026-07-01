@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+@theme {
+  --color-slate-150: #e2e8f0;
+  --color-slate-250: #cbd5e1;
+  --color-slate-650: #475569;
+  --color-slate-750: #334155;
+  --color-slate-850: #1f2937;
+  --color-slate-855: #111827;
+
+  --color-emerald-605: #059669;
+  --color-emerald-650: #047857;
+  --color-emerald-750: #065f46;
+  --color-emerald-755: #064e3b;
+
+  --color-red-650: #dc2626;
+  --color-red-755: #b91c1c;
+  --color-red-750: #991b1b;
+
+  --color-amber-250: #fcd34d;
+  --color-amber-750: #b45309;
+}
+
+/* Global premium transition for dark texts */
+.text-slate-800,
+.text-slate-850,
+.text-slate-855,
+.text-slate-900,
+.text-slate-950,
+.text-black,
+[class*="hover:text-slate-"],
+[class*="hover:text-black"] {
+  transition: color 0.15s ease-in-out !important;
+}
+
+/* Hover rule turning dark text to theme emerald green */
+.text-slate-800:hover,
+.text-slate-850:hover,
+.text-slate-855:hover,
+.text-slate-900:hover,
+.text-slate-950:hover,
+.text-black:hover,
+[class*="hover:text-slate-"]:hover,
+[class*="hover:text-black"]:hover,
+[class*="group-hover:text-slate-"]:hover,
+[class*="group-hover:text-black"]:hover,
+.group:hover [class*="group-hover:text-slate-"],
+.group:hover [class*="group-hover:text-black"] {
+  color: #059669 !important;
+}

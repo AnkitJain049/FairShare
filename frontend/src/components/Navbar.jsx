@@ -1,12 +1,16 @@
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, LayoutDashboard } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   const handleLogout = () => {
+    setIsLogoutConfirmOpen(false);
     logout();
     navigate('/login');
   };
@@ -46,8 +50,8 @@ export default function Navbar() {
                 </Link>
                 
                 <button
-                  onClick={handleLogout}
-                  className="flex items-center space-x-1 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all"
+                  onClick={() => setIsLogoutConfirmOpen(true)}
+                  className="flex items-center space-x-1 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   <span>Logout</span>
@@ -57,6 +61,17 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isLogoutConfirmOpen}
+        onClose={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={handleLogout}
+        title="Confirm Logout"
+        message="Are you sure you want to log out of your FairShare session?"
+        confirmText="Log Out"
+        cancelText="Cancel"
+        type="danger"
+      />
     </nav>
   );
 }
