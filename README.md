@@ -10,7 +10,7 @@ FairShare is a simple bill splitting web application (similar to Splitwise). It 
 | Topic / Component | Sub-Sections | Description |
 | :--- | :--- | :--- |
 | **[1. How It Works (Architecture)](#technical-architecture)** | • Simple System Diagram | An overview of the frontend, backend, and database layers. |
-| **[2. Setup Guide & Test Data](#setup)** | • [Backend Setup](#backend-setup)<br>• [Frontend Setup](#frontend-setup)<br>• [Testing Details](#testing-details) | Setup instructions, test credentials, and Razorpay test card info. |
+| **[2. Setup Guide & Test Data](#setup)** | • [Backend Setup](#backend-setup)<br>• [Frontend Setup](#frontend-setup)<br>• [Testing Details](#testing-details)<br>• [Production Deployment](#production-deployment) | Setup instructions, test credentials, Razorpay test cards, and Render/Vercel guides. |
 | **[3. Expense & Split Logic](#business-logic)** | • [Balance Formula](#balance-formula)<br>• [Splitting Options](#splitting-strategies)<br>• [Direct vs. Indirect Payments](#direct-vs-indirect) | How balances are calculated and how Equal, Exact, and Percentage splits work. |
 | **[4. Debt Simplification (Reducing Payments)](#simplification-algorithms)** | • [Greedy Method](#greedy-simplification)<br>• [DFS Method](#dfs-simplification) | Explaining the two methods we use to minimize the number of payments. |
 | **[5. Database Structure & Rules](#database-schemas)** | • [Tables & Fields](#db-entities)<br>• [Integrity Rules](#ledger-rules) | The database tables (collections) and how we keep the data clean and consistent. |
@@ -106,6 +106,41 @@ When using the **Razorpay** checkout option to settle up balances, you can test 
 | **RuPay** | `6527 6589 0000 1005` | Any future date & 3-digit CVV |
 | **Diners Club** | `3608 280009 1007` | Any future date & 3-digit CVV |
 | **Amex** | `3402 560004 01007` | Any future date & 3-digit CVV |
+
+---
+
+<a id="production-deployment"></a>
+## 🚀 Production Deployment Guide
+
+We can host the frontend on **Vercel** and the backend on **Render** using the instructions below.
+
+### 1. Backend Deployment (Render)
+Render is used to host the Java Spring Boot Backend using the pre-configured `Dockerfile`:
+1. Log in to your [Render Dashboard](https://dashboard.render.com/) and click **New > Web Service**.
+2. Connect your GitHub repository.
+3. In the creation form:
+   * **Name:** `fairshare-backend`
+   * **Root Directory:** `backend`
+   * **Runtime:** Select **Docker** (it will automatically compile and run the backend using `Dockerfile`).
+4. Under **Advanced**, click **Add Environment Variable** and enter the following keys:
+   * `MONGO_URI` = `mongodb+srv://...` (your MongoDB Atlas connection string)
+   * `JWT_SECRET` = `your_secret_key`
+   * `RAZORPAY_KEY_ID` = `rzp_test_...`
+   * `RAZORPAY_KEY_SECRET` = `your_razorpay_secret`
+   * `FRONTEND_URL` = `https://your-frontend-app.vercel.app` (your Vercel frontend URL)
+5. Click **Deploy Web Service**. Render will build the container and provide a public URL (e.g. `https://fairshare-backend.onrender.com`).
+
+### 2. Frontend Deployment (Vercel)
+Vercel is used to host the React Frontend:
+1. Log in to your [Vercel Dashboard](https://vercel.com/) and click **Add New > Project**.
+2. Connect your GitHub repository.
+3. In the project settings:
+   * **Framework Preset:** Select **Vite**.
+   * **Root Directory:** Select `frontend`.
+4. Click on **Environment Variables** and add:
+   * `VITE_API_BASE_URL` = `https://fairshare-backend.onrender.com` (your Render backend API URL)
+   * `VITE_FRONTEND_URL` = `https://your-frontend-app.vercel.app` (your frontend Vercel URL)
+5. Click **Deploy**. Vercel will host your client bundle.
 
 ---
 
