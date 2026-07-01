@@ -10,7 +10,7 @@ FairShare is a simple bill splitting web application (similar to Splitwise). It 
 | Topic / Component | Sub-Sections | Description |
 | :--- | :--- | :--- |
 | **[1. How It Works (Architecture)](#technical-architecture)** | • Simple System Diagram | An overview of the frontend, backend, and database layers. |
-| **[2. Setup Guide](#setup)** | • [Backend Setup](#backend-setup)<br>• [Frontend Setup](#frontend-setup) | Simple steps to configure `.env` files and run the project locally. |
+| **[2. Setup Guide & Test Data](#setup)** | • [Backend Setup](#backend-setup)<br>• [Frontend Setup](#frontend-setup)<br>• [Testing Details](#testing-details) | Setup instructions, test credentials, and Razorpay test card info. |
 | **[3. Expense & Split Logic](#business-logic)** | • [Balance Formula](#balance-formula)<br>• [Splitting Options](#splitting-strategies)<br>• [Direct vs. Indirect Payments](#direct-vs-indirect) | How balances are calculated and how Equal, Exact, and Percentage splits work. |
 | **[4. Debt Simplification (Reducing Payments)](#simplification-algorithms)** | • [Greedy Method](#greedy-simplification)<br>• [DFS Method](#dfs-simplification) | Explaining the two methods we use to minimize the number of payments. |
 | **[5. Database Structure & Rules](#database-schemas)** | • [Tables & Fields](#db-entities)<br>• [Integrity Rules](#ledger-rules) | The database tables (collections) and how we keep the data clean and consistent. |
@@ -83,6 +83,29 @@ FairShare is a simple bill splitting web application (similar to Splitwise). It 
    cd frontend
    npm run dev
    ```
+
+---
+
+<a id="testing-details"></a>
+## 🧪 Testing Credentials & Payment Info
+
+You can use the following pre-created test accounts to log in and try out the application:
+
+### 1. Test Users (Email - Password)
+* `user1@gmail.com` - `User1`
+* `user2@gmail.com` - `user2`
+* `user3@gmail.com` - `user3`
+
+### 2. Razorpay Test Cards
+When using the **Razorpay** checkout option to settle up balances, you can test various payment scenarios using the following card details. Use **any future expiration date** (e.g. `12/30`) and a **random 3-digit CVV** (e.g. `999`):
+
+| Card Network | Card Number | CVV & Expiry Date |
+| :--- | :--- | :--- |
+| **Visa** | `4100 2800 0000 1007` | Any future date & 3-digit CVV |
+| **Mastercard** | `5500 6700 0000 1002` | Any future date & 3-digit CVV |
+| **RuPay** | `6527 6589 0000 1005` | Any future date & 3-digit CVV |
+| **Diners Club** | `3608 280009 1007` | Any future date & 3-digit CVV |
+| **Amex** | `3402 560004 01007` | Any future date & 3-digit CVV |
 
 ---
 
