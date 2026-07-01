@@ -7,11 +7,6 @@
 **/build/
 **/out/
 
-# Compiled class files
-**/*.class
-**/*.jar
-**/*.war
-
 # IDE specific files
 **/.idea/
 **/.classpath
@@ -30,6 +25,15 @@
 # Crash logs
 **/hs_err_pid*
 **/replay_pid*
+
+# Build system wrappers
+# (Uncomment the lines below if you do not want to commit Maven/Gradle wrappers)
+# **/.mvn/
+# **/mvnw
+# **/mvnw.cmd
+# **/.gradle/
+# **/gradlew
+# **/gradlew.bat
 
 # ==========================================
 # ⚛️ React Frontend
@@ -69,5 +73,5 @@
 # ==========================================
 # 🖥️ Operating System Specific
 # ==========================================
-**/.DS_Store
-**/Thumbs.db
+.DS_Store
+Thumbs.db

@@ -9,17 +9,21 @@ import com.example.backend.auth.repository.UserRepository;
 import com.example.backend.model.Group;
 import com.example.backend.repository.ExpenseRepository;
 import com.example.backend.repository.GroupRepository;
+import com.example.backend.repository.PaymentRepository;
 
 @Service
 public class GroupService {
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
     private final ExpenseRepository expenseRepository;
+    private final PaymentRepository paymentRepository;
 
-    public GroupService(GroupRepository groupRepository, UserRepository userRepository, ExpenseRepository expenseRepository) {
+    public GroupService(GroupRepository groupRepository, UserRepository userRepository, 
+                        ExpenseRepository expenseRepository, PaymentRepository paymentRepository) {
         this.groupRepository = groupRepository;
         this.userRepository = userRepository;
         this.expenseRepository = expenseRepository;
+        this.paymentRepository = paymentRepository;
     }
 
     public Group createGroup(String name, List<String> memberIds) {
@@ -64,6 +68,8 @@ public class GroupService {
         }
         // Delete all expenses belonging to this group
         expenseRepository.deleteByGroupId(groupId);
+        // Delete all payments belonging to this group
+        paymentRepository.deleteByGroupId(groupId);
         // Delete the group itself
         groupRepository.deleteById(groupId);
     }

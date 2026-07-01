@@ -174,4 +174,46 @@ export const api = {
         headers: getHeaders(),
       }).then(handleResponse),
   },
+
+  // Payments
+  payments: {
+    recordCash: (groupId, payerId, receiverId, amount, relatedExpenseId) => 
+      fetch(`${API_BASE_URL}/api/payments/cash`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ groupId, payerId, receiverId, amount, relatedExpenseId }),
+      }).then(handleResponse),
+
+    createRazorpayOrder: (groupId, payerId, receiverId, amount, relatedExpenseId) => 
+      fetch(`${API_BASE_URL}/api/payments/razorpay/order`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ groupId, payerId, receiverId, amount, relatedExpenseId }),
+      }).then(handleResponse),
+
+    verifyRazorpayPayment: (razorpayOrderId, razorpayPaymentId, razorpaySignature) => 
+      fetch(`${API_BASE_URL}/api/payments/razorpay/verify`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ razorpayOrderId, razorpayPaymentId, razorpaySignature }),
+      }).then(handleResponse),
+
+    approvePayment: (paymentId) => 
+      fetch(`${API_BASE_URL}/api/payments/${paymentId}/approve`, {
+        method: 'POST',
+        headers: getHeaders(),
+      }).then(handleResponse),
+
+    rejectPayment: (paymentId) => 
+      fetch(`${API_BASE_URL}/api/payments/${paymentId}/reject`, {
+        method: 'POST',
+        headers: getHeaders(),
+      }).then(handleResponse),
+
+    getGroupPayments: (groupId) => 
+      fetch(`${API_BASE_URL}/api/payments/group/${groupId}`, {
+        method: 'GET',
+        headers: getHeaders(),
+      }).then(handleResponse),
+  },
 };

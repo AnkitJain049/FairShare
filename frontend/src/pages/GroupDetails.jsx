@@ -2,28 +2,33 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { 
-  ArrowLeft, Plus, DollarSign, Calendar, Info, 
-  TrendingDown, TrendingUp, Sparkles, Loader2, AlertCircle, Check, X,
-  Trash2, Edit
+import {
+  ArrowLeft, Plus, DollarSign, Calendar, Info,
+  Loader2, AlertCircle, Check, X, Trash2, Edit
 } from 'lucide-react';
+import ConfirmModal from '../components/ConfirmModal';
+import RenameGroupModal from '../components/RenameGroupModal';
+import ExpenseCard from '../components/ExpenseCard';
+import BalanceSummary from '../components/BalanceSummary';
+import SimplifySettlements from '../components/SimplifySettlements';
+import SettlePaymentModal from '../components/SettlePaymentModal';
 
 export default function GroupDetails() {
   const { groupId } = useParams();
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
-  
+
   // Group editing / deletion states
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
-  
+
   // Expense editing/deleting states
   const [isEditingExpense, setIsEditingExpense] = useState(false);
   const [editExpenseId, setEditExpenseId] = useState(null);
   const [isDeleteExpenseModalOpen, setIsDeleteExpenseModalOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
-  
+
   // Group, Members and loading states
   const [group, setGroup] = useState(null);
   const [membersMap, setMembersMap] = useState({}); // id -> user object
@@ -52,6 +57,17 @@ export default function GroupDetails() {
   const [modalError, setModalError] = useState('');
   const [submittingExpense, setSubmittingExpense] = useState(false);
 
+  // Payment / Settlement States
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
+  const [settlePayerId, setSettlePayerId] = useState('');
+  const [settleReceiverId, setSettleReceiverId] = useState('');
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settleExpenseId, setSettleExpenseId] = useState('');
+  const [activeTab, setActiveTab] = useState('balances'); // 'balances', 'expenses', or 'settlements'
+  const [toastMessage, setToastMessage] = useState('');
+
   // Fetch initial group and load members details
   useEffect(() => {
     const loadGroupAndMembers = async () => {
@@ -62,8 +78,8 @@ export default function GroupDetails() {
 
         // Fetch user profiles for all members in parallel
         const memberProfiles = await Promise.all(
-          groupData.memberIds.map(id => 
-            api.users.getUserById(id).catch(() => ({ id, name: `User (${id.substring(0,6)}...)` }))
+          groupData.memberIds.map(id =>
+            api.users.getUserById(id).catch(() => ({ id, name: `User (${id.substring(0, 6)}...)` }))
           )
         );
 
@@ -79,7 +95,7 @@ export default function GroupDetails() {
           owedAmount: '',
           percentage: ''
         })));
-        
+
         setPaidBy(currentUser.id);
       } catch (err) {
         setError('Failed to fetch group details.');
@@ -123,19 +139,85 @@ export default function GroupDetails() {
     }
   };
 
+  const fetchPayments = async () => {
+    try {
+      setPaymentsLoading(true);
+      const data = await api.payments.getGroupPayments(groupId);
+      setPayments(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  const handleApprovePayment = async (paymentId) => {
+    try {
+      await api.payments.approvePayment(paymentId);
+      showToast('Payment confirmed successfully!');
+      fetchBalancesAndSimplification();
+      fetchPayments();
+      fetchExpenses(currentPage);
+    } catch (err) {
+      showToast(err.message || 'Failed to approve payment.');
+    }
+  };
+
+  const handleRejectPayment = async (paymentId) => {
+    try {
+      await api.payments.rejectPayment(paymentId);
+      showToast('Payment rejected.');
+      fetchBalancesAndSimplification();
+      fetchPayments();
+      fetchExpenses(currentPage);
+    } catch (err) {
+      showToast(err.message || 'Failed to reject payment.');
+    }
+  };
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 4500);
+  };
+
+  const handleSettleClick = (payerId, receiverId, amount = null) => {
+    setSettlePayerId(payerId);
+    setSettleReceiverId(receiverId);
+    setSettleAmount(amount ? amount : '');
+    setSettleExpenseId('');
+    setIsSettleModalOpen(true);
+  };
+
+  const handleSettleExpenseShare = (receiverId, amount, expenseId) => {
+    setSettlePayerId(currentUser.id);
+    setSettleReceiverId(receiverId);
+    setSettleAmount(amount);
+    setSettleExpenseId(expenseId);
+    setIsSettleModalOpen(true);
+  };
+
+  const handleSettleSuccess = (message) => {
+    setIsSettleModalOpen(false);
+    showToast(message);
+    fetchBalancesAndSimplification();
+    fetchPayments();
+    fetchExpenses(currentPage);
+  };
+
   useEffect(() => {
     if (group) {
       fetchExpenses(0);
       fetchBalancesAndSimplification();
+      fetchPayments();
     }
   }, [group, algo]);
 
   // Split details value handlers
   const handleSplitValueChange = (userId, field, val) => {
-    setSplitDetails(prev => 
-      prev.map(item => 
-        item.userId === userId 
-          ? { ...item, [field]: val } 
+    setSplitDetails(prev =>
+      prev.map(item =>
+        item.userId === userId
+          ? { ...item, [field]: val }
           : item
       )
     );
@@ -187,7 +269,7 @@ export default function GroupDetails() {
     setTotalAmount(expense.totalAmount.toString());
     setPaidBy(expense.paidById);
     setSplitType(expense.splitType);
-    
+
     // Load split details
     const loadedDetails = group.memberIds.map(id => {
       const expSplit = expense.splitDetails.find(s => s.userId === id);
@@ -198,7 +280,7 @@ export default function GroupDetails() {
       };
     });
     setSplitDetails(loadedDetails);
-    
+
     setIsModalOpen(true);
   };
 
@@ -206,7 +288,7 @@ export default function GroupDetails() {
   const handleAddExpense = async (e) => {
     e.preventDefault();
     setModalError('');
-    
+
     if (!description.trim()) {
       setModalError('Description is required.');
       return;
@@ -239,7 +321,7 @@ export default function GroupDetails() {
           owedAmount: itemAmount
         });
       }
-      
+
       // Check if exact split equals total amount (rounding to 2 decimals)
       if (Math.abs(sum - amountVal) > 0.01) {
         setModalError(`Total splits (₹${sum.toFixed(2)}) must equal total amount (₹${amountVal.toFixed(2)}).`);
@@ -301,7 +383,7 @@ export default function GroupDetails() {
       setIsEditingExpense(false);
       setEditExpenseId(null);
       setIsModalOpen(false);
-      
+
       fetchExpenses(0);
       fetchBalancesAndSimplification();
     } catch (err) {
@@ -373,6 +455,13 @@ export default function GroupDetails() {
           </button>
 
           <button
+            onClick={() => handleSettleClick('', '')}
+            className="flex items-center justify-center space-x-1.5 bg-white border border-emerald-600 text-emerald-650 hover:bg-emerald-50 px-4.5 py-2.5 rounded-xl font-bold transition-all text-sm shadow-sm cursor-pointer"
+          >
+            <span>Settle Up</span>
+          </button>
+
+          <button
             onClick={() => {
               setIsEditingExpense(false);
               setEditExpenseId(null);
@@ -382,7 +471,7 @@ export default function GroupDetails() {
               setPaidBy(currentUser.id);
               setIsModalOpen(true);
             }}
-            className="flex items-center justify-center space-x-1.5 bg-emerald-600 text-white px-4.5 py-2.5 rounded-xl font-bold hover:bg-emerald-500 shadow-md shadow-emerald-500/10 transition-all text-sm"
+            className="flex items-center justify-center space-x-1.5 bg-emerald-600 text-white px-4.5 py-2.5 rounded-xl font-bold hover:bg-emerald-500 shadow-md shadow-emerald-500/10 transition-all text-sm cursor-pointer"
           >
             <Plus className="h-4.5 w-4.5 stroke-[2.5]" />
             <span>Add Expense</span>
@@ -390,189 +479,223 @@ export default function GroupDetails() {
         </div>
       </div>
 
-      {/* Two Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* LEFT COLUMN: Expense List */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <h2 className="text-xl font-bold mb-5 text-slate-850">Expense History</h2>
-            
-            {expensesLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
-              </div>
-            ) : expenses.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-slate-250 rounded-xl bg-slate-50/20">
-                <Info className="h-10 w-10 text-slate-400 mx-auto mb-2" />
-                <p className="text-slate-500 text-sm">No expenses logged yet in this group.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {expenses.map((expense) => (
-                  <div 
-                    key={expense.id} 
-                    className="bg-slate-50/70 border border-slate-200 p-4.5 rounded-xl flex items-center justify-between hover:border-slate-350 transition-colors group/item shadow-sm"
+      {/* Pending Confirmations Section */}
+      {payments.some(p => p.receiverId === currentUser?.id && p.status === 'AWAITING_APPROVAL') && (
+        <div className="mb-8 bg-amber-50/50 border border-amber-250 rounded-2xl p-5 shadow-sm animate-fade-in">
+          <h3 className="text-sm font-extrabold text-amber-800 flex items-center space-x-2 mb-3">
+            <AlertCircle className="h-4.5 w-4.5" />
+            <span>Payments Awaiting Your Confirmation</span>
+          </h3>
+          <div className="space-y-3">
+            {payments.filter(p => p.receiverId === currentUser?.id && p.status === 'AWAITING_APPROVAL').map(p => (
+              <div key={p.id} className="bg-white border border-amber-200/60 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm shadow-sm">
+                <div>
+                  <span className="font-bold text-slate-800">{membersMap[p.payerId]?.name || 'Someone'}</span>
+                  <span className="text-slate-600"> claims they settled </span>
+                  <span className="font-extrabold text-emerald-650">₹{p.amount.toFixed(2)}</span>
+                  <span className="text-slate-600"> via </span>
+                  <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-xs text-slate-700 rounded font-semibold uppercase">{p.paymentMethod}</span>
+                  {p.relatedExpenseId && (
+                    <span className="text-slate-400 text-xs block mt-1 font-semibold">
+                      For expense: {expenses.find(e => e.id === p.relatedExpenseId)?.description || 'Linked Expense'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2.5 self-end sm:self-center">
+                  <button
+                    onClick={() => handleRejectPayment(p.id)}
+                    className="px-3.5 py-2 border border-red-200 text-red-650 hover:bg-red-50 rounded-xl text-xs font-bold transition-all cursor-pointer"
                   >
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => handleApprovePayment(p.id)}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-emerald-500/10 cursor-pointer"
+                  >
+                    Confirm Receipt
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main Navigation Tabs */}
+      <div className="flex border-b border-slate-200 mb-8 mt-2">
+        <button
+          onClick={() => setActiveTab('balances')}
+          className={`pb-3 font-bold text-sm tracking-wide transition-all border-b-2 px-1 cursor-pointer ${activeTab === 'balances'
+              ? 'border-emerald-600 text-emerald-650'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+        >
+          Balance Sheet
+        </button>
+        <button
+          onClick={() => setActiveTab('expenses')}
+          className={`ml-8 pb-3 font-bold text-sm tracking-wide transition-all border-b-2 px-1 cursor-pointer ${activeTab === 'expenses'
+              ? 'border-emerald-600 text-emerald-650'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+        >
+          Expenses
+        </button>
+        <button
+          onClick={() => setActiveTab('settlements')}
+          className={`ml-8 pb-3 font-bold text-sm tracking-wide transition-all border-b-2 px-1 cursor-pointer ${activeTab === 'settlements'
+              ? 'border-emerald-600 text-emerald-650'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+        >
+          Settlements
+        </button>
+      </div>
+
+      {/* Tab Panels */}
+      {activeTab === 'expenses' && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-xl font-bold mb-5 text-slate-850">Expense History</h2>
+          {expensesLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
+            </div>
+          ) : expenses.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-slate-250 rounded-xl bg-slate-50/20">
+              <Info className="h-10 w-10 text-slate-400 mx-auto mb-2" />
+              <p className="text-slate-500 text-sm">No expenses logged yet in this group.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {expenses.map((expense) => (
+                <ExpenseCard
+                  key={expense.id}
+                  expense={expense}
+                  membersMap={membersMap}
+                  onEdit={openEditExpenseModal}
+                  onDelete={handleDeleteExpenseClick}
+                  currentUser={currentUser}
+                  payments={payments}
+                  allExpenses={expenses}
+                  onSettleExpenseShare={handleSettleExpenseShare}
+                />
+              ))}
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex justify-between items-center pt-4 border-t border-slate-150">
+                  <button
+                    disabled={currentPage === 0}
+                    onClick={() => fetchExpenses(currentPage - 1)}
+                    className="text-xs px-3.5 py-2 border border-slate-200 rounded-lg bg-slate-50 font-semibold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-slate-700 cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-slate-500 font-semibold">
+                    Page {currentPage + 1} of {totalPages}
+                  </span>
+                  <button
+                    disabled={currentPage === totalPages - 1}
+                    onClick={() => fetchExpenses(currentPage + 1)}
+                    className="text-xs px-3.5 py-2 border border-slate-200 rounded-lg bg-slate-50 font-semibold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-slate-700 cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'settlements' && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-xl font-bold mb-5 text-slate-850">Payment History</h2>
+          {paymentsLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
+            </div>
+          ) : payments.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-slate-250 rounded-xl bg-slate-50/20">
+              <Info className="h-10 w-10 text-slate-400 mx-auto mb-2" />
+              <p className="text-slate-500 text-sm">No payment settlements logged yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {[...payments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((pay) => {
+                const isPayer = pay.payerId === currentUser?.id;
+                const isReceiver = pay.receiverId === currentUser?.id;
+                const payerName = isPayer ? 'You' : (membersMap[pay.payerId]?.name || 'Unknown');
+                const receiverName = isReceiver ? 'You' : (membersMap[pay.receiverId]?.name || 'Unknown');
+                const dateStr = new Date(pay.createdAt).toLocaleDateString();
+
+                return (
+                  <div key={pay.id} className="bg-slate-50/70 border border-slate-200 p-4.5 rounded-xl flex items-center justify-between hover:border-slate-300 transition-colors shadow-sm">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <h4 className="font-bold text-slate-800">{expense.description}</h4>
-                        <div className="flex items-center space-x-2 text-slate-400">
-                          <button
-                            onClick={() => openEditExpenseModal(expense)}
-                            className="p-1 hover:text-emerald-600 rounded transition-colors"
-                            title="Edit Expense"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteExpenseClick(expense)}
-                            className="p-1 hover:text-red-600 rounded transition-colors"
-                            title="Delete Expense"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-slate-800">{payerName}</span>
+                        <span className="text-slate-500 text-xs font-semibold">settled with</span>
+                        <span className="font-bold text-slate-800">{receiverName}</span>
                       </div>
                       <p className="text-xs text-slate-500 mt-1 flex items-center space-x-4">
-                        <span>Paid by <span className="text-slate-700 font-semibold">{membersMap[expense.paidById]?.name || 'Unknown'}</span></span>
+                        <span>Via <span className="font-semibold text-slate-700 uppercase">{pay.paymentMethod}</span></span>
                         <span>•</span>
                         <span className="flex items-center space-x-1">
                           <Calendar className="h-3 w-3 text-slate-400" />
-                          <span>{new Date(expense.createdAt).toLocaleDateString()}</span>
+                          <span>{dateStr}</span>
                         </span>
+                        {pay.relatedExpenseId && (
+                          <>
+                            <span>•</span>
+                            <span className="text-slate-400 text-xs font-semibold">
+                              For: {expenses.find(e => e.id === pay.relatedExpenseId)?.description || 'Linked Expense'}
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-emerald-600">₹{expense.totalAmount.toFixed(2)}</p>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-500 uppercase tracking-wide shadow-sm">
-                        {expense.splitType}
+                    <div className="text-right flex flex-col items-end">
+                      <p className="text-base font-extrabold text-emerald-605 font-mono">₹{pay.amount.toFixed(2)}</p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border mt-1 shadow-sm uppercase tracking-wide ${pay.status === 'COMPLETED'
+                          ? 'bg-emerald-50 text-emerald-755 border-emerald-100'
+                          : pay.status === 'AWAITING_APPROVAL'
+                            ? 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse'
+                            : pay.status === 'REJECTED'
+                              ? 'bg-red-50 text-red-750 border-red-100'
+                              : 'bg-slate-100 text-slate-650 border-slate-250'
+                        }`}>
+                        {pay.status === 'COMPLETED' ? 'Settled' : pay.status === 'AWAITING_APPROVAL' ? 'Pending' : pay.status === 'REJECTED' ? 'Rejected' : pay.status}
                       </span>
                     </div>
                   </div>
-                ))}
-
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <div className="flex justify-between items-center pt-4 border-t border-slate-150">
-                    <button
-                      disabled={currentPage === 0}
-                      onClick={() => fetchExpenses(currentPage - 1)}
-                      className="text-xs px-3.5 py-2 border border-slate-200 rounded-lg bg-slate-50 font-semibold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-slate-700"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-xs text-slate-500 font-semibold">
-                      Page {currentPage + 1} of {totalPages}
-                    </span>
-                    <button
-                      disabled={currentPage === totalPages - 1}
-                      onClick={() => fetchExpenses(currentPage + 1)}
-                      className="text-xs px-3.5 py-2 border border-slate-200 rounded-lg bg-slate-50 font-semibold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-slate-700"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: Balances & Debt Simplification */}
-        <div className="space-y-8">
-          {/* 1. Balance Summary Card */}
-          {balances && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-xl font-bold mb-5 text-slate-850">Your Balance Summary</h2>
-              
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-slate-50 border border-slate-150 p-4 rounded-xl flex flex-col justify-center shadow-sm">
-                  <div className="flex items-center space-x-1 text-xs text-emerald-600 font-semibold uppercase tracking-wider mb-1">
-                    <TrendingUp className="h-4 w-4" />
-                    <span>You are owed</span>
-                  </div>
-                  <p className="text-2xl font-black text-emerald-600">₹{balances.totalYouAreOwed.toFixed(2)}</p>
-                </div>
-                <div className="bg-slate-50 border border-slate-150 p-4 rounded-xl flex flex-col justify-center shadow-sm">
-                  <div className="flex items-center space-x-1 text-xs text-rose-600 font-semibold uppercase tracking-wider mb-1">
-                    <TrendingDown className="h-4 w-4" />
-                    <span>You owe</span>
-                  </div>
-                  <p className="text-2xl font-black text-rose-600">₹{balances.totalYouOwe.toFixed(2)}</p>
-                </div>
-              </div>
-
-              {/* Individual member breakdown */}
-              <div>
-                <h4 className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-3">Group Balances Breakdown</h4>
-                <div className="space-y-3">
-                  {Object.entries(balances.userVsBalance).map(([memberId, amt]) => {
-                    if (memberId === currentUser.id) return null;
-                    const value = parseFloat(amt);
-                    const name = membersMap[memberId]?.name || 'Unknown';
-                    
-                    return (
-                      <div key={memberId} className="flex justify-between items-center text-sm bg-slate-50/70 p-3 rounded-xl border border-slate-200">
-                        <span className="font-semibold text-slate-750">{name}</span>
-                        {value > 0 ? (
-                          <span className="text-emerald-600 font-bold text-xs">owes you ₹{value.toFixed(2)}</span>
-                        ) : value < 0 ? (
-                          <span className="text-rose-600 font-bold text-xs">you owe ₹{Math.abs(value).toFixed(2)}</span>
-                        ) : (
-                          <span className="text-slate-500 font-bold text-xs">settled</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                );
+              })}
             </div>
           )}
+        </div>
+      )}
 
-          {/* 2. Debt Simplification Panel */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl font-bold flex items-center space-x-1.5 text-slate-850">
-                <Sparkles className="h-5 w-5 text-emerald-600" />
-                <span>Simplify Settlements</span>
-              </h2>
-            </div>
-
-            {simplifyLoading ? (
-              <div className="flex justify-center py-6">
-                <Loader2 className="h-6 w-6 text-emerald-600 animate-spin" />
-              </div>
-            ) : simplifiedDebts.length === 0 ? (
-              <p className="text-center py-6 text-slate-500 text-sm font-semibold">All balances are completely settled!</p>
-            ) : (
-              <div className="space-y-3">
-                {simplifiedDebts.map((debt, index) => (
-                  <div 
-                    key={index}
-                    className="bg-slate-50/70 border border-slate-200 p-3.5 rounded-xl text-sm flex flex-col justify-center space-y-1.5 shadow-sm"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-slate-800">
-                        {membersMap[debt.fromUserId]?.name || 'Unknown'}
-                      </span>
-                      <span className="text-slate-500 text-xs px-2 py-0.5 bg-white border border-slate-200 rounded shadow-sm">
-                        owes
-                      </span>
-                      <span className="font-semibold text-slate-800">
-                        {membersMap[debt.toUserId]?.name || 'Unknown'}
-                      </span>
-                    </div>
-                    <div className="border-t border-slate-100 pt-1.5 flex justify-end">
-                      <span className="text-emerald-600 font-extrabold text-base">₹{debt.amount.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      {activeTab === 'balances' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1">
+            <BalanceSummary
+              balances={balances}
+              currentUser={currentUser}
+              membersMap={membersMap}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <SimplifySettlements
+              simplifiedDebts={simplifiedDebts}
+              membersMap={membersMap}
+              loading={simplifyLoading}
+              currentUser={currentUser}
+              onSettleClick={handleSettleClick}
+              payments={payments}
+            />
           </div>
         </div>
-      </div>
+      )}
 
       {/* ADD EXPENSE MODAL */}
       {isModalOpen && (
@@ -670,14 +793,14 @@ export default function GroupDetails() {
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                     {splitType === 'EXACT' ? 'Enter Exact Share Amounts' : 'Enter Share Percentages'}
                   </p>
-                  
+
                   <div className="space-y-3.5 max-h-48 overflow-y-auto pr-1">
                     {splitDetails.map((item) => (
                       <div key={item.userId} className="flex justify-between items-center bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-sm text-slate-750">
                         <span className="font-semibold text-slate-850">
                           {membersMap[item.userId]?.name || 'Unknown'}
                         </span>
-                        
+
                         <div className="flex items-center space-x-1.5 w-1/3">
                           {splitType === 'EXACT' ? (
                             <>
@@ -753,138 +876,49 @@ export default function GroupDetails() {
         </div>
       )}
 
-      {/* EDIT GROUP NAME MODAL */}
-      {isRenameModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
-            <button
-              onClick={() => setIsRenameModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
+      <RenameGroupModal
+        isOpen={isRenameModalOpen}
+        onClose={() => setIsRenameModalOpen(false)}
+        onSubmit={handleRenameGroup}
+        initialName={group.name}
+      />
 
-            <h2 className="text-2xl font-bold mb-5 flex items-center space-x-2 text-slate-800">
-              <Edit className="h-6 w-6 text-emerald-600" />
-              <span>Rename Group</span>
-            </h2>
+      <ConfirmModal
+        isOpen={isDeleteGroupModalOpen}
+        onClose={() => setIsDeleteGroupModalOpen(false)}
+        onConfirm={handleDeleteGroup}
+        title="Delete Group?"
+        message={`Are you sure you want to delete "${group.name}"? This action is permanent and will delete all transaction records and balance sheets for this group.`}
+      />
 
-            <form onSubmit={handleRenameGroup} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-750 mb-1.5">New Group Name</label>
-                <input
-                  type="text"
-                  required
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  className="block w-full rounded-xl bg-white border border-slate-250 text-slate-850 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent px-4 py-2.5 text-sm transition-all shadow-sm"
-                  placeholder="e.g. Goa Trip 2026"
-                />
-              </div>
+      <ConfirmModal
+        isOpen={isDeleteExpenseModalOpen}
+        onClose={() => {
+          setIsDeleteExpenseModalOpen(false);
+          setExpenseToDelete(null);
+        }}
+        onConfirm={confirmDeleteExpense}
+        title="Delete Expense?"
+        message={expenseToDelete ? `Are you sure you want to delete "${expenseToDelete.description}" of ₹${expenseToDelete.totalAmount.toFixed(2)}? This will automatically recalculate everyone's balances and simplify settlements.` : ''}
+      />
 
-              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsRenameModalOpen(false)}
-                  className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-semibold px-4 py-2.5 rounded-xl text-sm transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <SettlePaymentModal
+        isOpen={isSettleModalOpen}
+        onClose={() => setIsSettleModalOpen(false)}
+        group={group}
+        currentUser={currentUser}
+        membersMap={membersMap}
+        prefilledReceiverId={settleReceiverId}
+        prefilledAmount={settleAmount}
+        prefilledExpenseId={settleExpenseId}
+        expenses={expenses}
+        onSuccess={handleSettleSuccess}
+      />
 
-      {/* DELETE GROUP CONFIRMATION MODAL */}
-      {isDeleteGroupModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
-            <button
-              onClick={() => setIsDeleteGroupModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            <h2 className="text-xl font-bold mb-3 text-red-600 flex items-center space-x-2">
-              <AlertCircle className="h-6 w-6" />
-              <span>Delete Group?</span>
-            </h2>
-
-            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              Are you sure you want to delete <span className="font-semibold text-slate-800">"{group.name}"</span>? 
-              This action is permanent and will delete all transaction records and balance sheets for this group.
-            </p>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setIsDeleteGroupModalOpen(false)}
-                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 font-semibold px-4 py-2.5 rounded-xl text-sm transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteGroup}
-                className="bg-red-700 hover:bg-red-800 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all shadow-md shadow-red-200"
-              >
-                Delete Permanently
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DELETE EXPENSE CONFIRMATION MODAL */}
-      {isDeleteExpenseModalOpen && expenseToDelete && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
-            <button
-              onClick={() => {
-                setIsDeleteExpenseModalOpen(false);
-                setExpenseToDelete(null);
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            <h2 className="text-xl font-bold mb-3 text-red-600 flex items-center space-x-2">
-              <AlertCircle className="h-6 w-6" />
-              <span>Delete Expense?</span>
-            </h2>
-
-            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              Are you sure you want to delete <span className="font-semibold text-slate-800">"{expenseToDelete.description}"</span> of <span className="font-bold text-slate-800">₹{expenseToDelete.totalAmount.toFixed(2)}</span>? 
-              This will automatically recalculate everyone's balances and simplify settlements.
-            </p>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDeleteExpenseModalOpen(false);
-                  setExpenseToDelete(null);
-                }}
-                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 font-semibold px-4 py-2.5 rounded-xl text-sm transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteExpense}
-                className="bg-red-700 hover:bg-red-800 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all shadow-md shadow-red-200"
-              >
-                Delete Permanently
-              </button>
-            </div>
-          </div>
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-850 text-white px-5 py-3 rounded-xl shadow-xl flex items-center space-x-2.5 text-sm font-semibold border border-slate-700/80 animate-fade-in">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

@@ -12,6 +12,7 @@ import com.example.backend.model.Split;
 import com.example.backend.model.SplitType;
 import com.example.backend.repository.ExpenseRepository;
 import com.example.backend.repository.GroupRepository;
+import com.example.backend.repository.PaymentRepository;
 import com.example.backend.splitter.ISplitStrategy;
 import com.example.backend.splitter.SplitStrategyFactory;
 
@@ -20,12 +21,14 @@ public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final GroupRepository groupRepository;
     private final SplitStrategyFactory splitStrategyFactory;
+    private final PaymentRepository paymentRepository;
 
     public ExpenseService(ExpenseRepository expenseRepository, GroupRepository groupRepository,
-                          SplitStrategyFactory splitStrategyFactory) {
+                          SplitStrategyFactory splitStrategyFactory, PaymentRepository paymentRepository) {
         this.expenseRepository = expenseRepository;
         this.groupRepository = groupRepository;
         this.splitStrategyFactory = splitStrategyFactory;
+        this.paymentRepository = paymentRepository;
     }
 
     public Expense createExpense(String groupId, String description, BigDecimal totalAmount,
@@ -93,6 +96,8 @@ public class ExpenseService {
         if (!expenseRepository.existsById(expenseId)) {
             throw new ResourceNotFoundException("Expense not found with id: " + expenseId);
         }
+        // Delete all payments associated with this specific expense
+        paymentRepository.deleteByRelatedExpenseId(expenseId);
         expenseRepository.deleteById(expenseId);
     }
 }

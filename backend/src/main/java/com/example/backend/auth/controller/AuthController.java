@@ -37,9 +37,15 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already registered");
         }
 
+        String trimmedPhone = request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null;
+        if (trimmedPhone != null && !trimmedPhone.isEmpty() && userRepository.existsByPhoneNumber(trimmedPhone)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Phone number already registered");
+        }
+
         User user = new User();
         user.setName(request.getName());
         user.setEmail(normalizedEmail);
+        user.setPhoneNumber(trimmedPhone);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setCreatedAt(Instant.now());
 
@@ -51,7 +57,8 @@ public class AuthController {
                 "Bearer",
                 savedUser.getId(),
                 savedUser.getName(),
-                savedUser.getEmail());
+                savedUser.getEmail(),
+                savedUser.getPhoneNumber());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -70,7 +77,8 @@ public class AuthController {
                 "Bearer",
                 user.getId(),
                 user.getName(),
-                user.getEmail());
+                user.getEmail(),
+                user.getPhoneNumber());
 
         return ResponseEntity.ok(response);
     }
