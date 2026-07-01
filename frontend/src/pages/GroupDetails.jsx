@@ -416,6 +416,8 @@ export default function GroupDetails() {
     );
   }
 
+  const hasNothingToPay = !balances || !balances.totalYouOwe || balances.totalYouOwe < 0.01;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-slate-850">
       {/* Back Button */}
@@ -456,7 +458,12 @@ export default function GroupDetails() {
 
           <button
             onClick={() => handleSettleClick('', '')}
-            className="flex items-center justify-center space-x-1.5 bg-white border border-emerald-600 text-emerald-650 hover:bg-emerald-50 px-4.5 py-2.5 rounded-xl font-bold transition-all text-sm shadow-sm cursor-pointer"
+            disabled={hasNothingToPay}
+            className={`flex items-center justify-center space-x-1.5 px-4.5 py-2.5 rounded-xl font-bold transition-all text-sm ${
+              hasNothingToPay
+                ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                : 'bg-white border border-emerald-600 text-emerald-650 hover:bg-emerald-50 shadow-sm cursor-pointer'
+            }`}
           >
             <span>Settle Up</span>
           </button>
