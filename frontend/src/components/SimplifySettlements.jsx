@@ -62,6 +62,14 @@ export default function SimplifySettlements({ simplifiedDebts, membersMap, loadi
                             Settle Up
                           </button>
                         )}
+                        {isUserCreditor && (
+                          <button
+                            onClick={() => onSettleClick(debt.fromUserId, currentUser.id, debt.amount)}
+                            className="text-xs bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg font-bold border border-slate-200 transition-all cursor-pointer"
+                          >
+                            Record Cash
+                          </button>
+                        )}
                       </>
                     )}
                   </div>

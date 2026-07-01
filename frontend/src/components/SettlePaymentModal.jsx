@@ -8,6 +8,7 @@ export default function SettlePaymentModal({
   group,
   currentUser,
   membersMap,
+  prefilledPayerId = '',
   prefilledReceiverId = '',
   prefilledAmount = '',
   prefilledExpenseId = '',
@@ -35,13 +36,18 @@ export default function SettlePaymentModal({
 
   // Update form fields when prefilled properties change
   useEffect(() => {
+    if (prefilledPayerId) {
+      setPayerId(prefilledPayerId);
+    } else {
+      setPayerId(currentUser.id);
+    }
     if (prefilledReceiverId) setReceiverId(prefilledReceiverId);
     if (prefilledAmount) setAmount(prefilledAmount);
     if (prefilledExpenseId) {
       setSelectedExpenseId(prefilledExpenseId);
       setLinkToExpense(true);
     }
-  }, [prefilledReceiverId, prefilledAmount, prefilledExpenseId]);
+  }, [prefilledPayerId, prefilledReceiverId, prefilledAmount, prefilledExpenseId]);
 
   if (!isOpen) return null;
 
@@ -80,7 +86,9 @@ export default function SettlePaymentModal({
     setError('');
     setLoading(true);
 
-    if (!receiverId) {
+    const finalReceiverId = payerId !== currentUser.id ? currentUser.id : receiverId;
+
+    if (!finalReceiverId) {
       setError('Please select a receiver.');
       setLoading(false);
       return;
@@ -99,7 +107,7 @@ export default function SettlePaymentModal({
         const payment = await api.payments.recordCash(
           group.id,
           payerId,
-          receiverId,
+          finalReceiverId,
           parseFloat(amount),
           relExpenseId
         );
@@ -122,7 +130,7 @@ export default function SettlePaymentModal({
         const orderDetails = await api.payments.createRazorpayOrder(
           group.id,
           payerId,
-          receiverId,
+          finalReceiverId,
           parseFloat(amount),
           relExpenseId
         );
@@ -202,24 +210,37 @@ export default function SettlePaymentModal({
         )}
 
         <form onSubmit={handleSettle} className="space-y-4">
+          {/* Payer Display (Read-Only to enforce payment lock) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payer (Who Paid)</label>
+            <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 text-sm font-semibold select-none">
+              {payerId === currentUser.id ? 'You' : (membersMap[payerId]?.name || 'Unknown')}
+            </div>
+          </div>
 
           {/* Receiver Selection */}
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Recipient (Who Received)</label>
-            <select
-              value={receiverId}
-              onChange={(e) => setReceiverId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 font-semibold"
-              disabled={loading}
-              required
-            >
-              <option value="">Select recipient...</option>
-              {eligibleReceivers.map(memberId => (
-                <option key={memberId} value={memberId}>
-                  {membersMap[memberId]?.name || 'Unknown'}
-                </option>
-              ))}
-            </select>
+            {payerId !== currentUser.id ? (
+              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 text-sm font-semibold select-none">
+                You
+              </div>
+            ) : (
+              <select
+                value={receiverId}
+                onChange={(e) => setReceiverId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 font-semibold"
+                disabled={loading}
+                required
+              >
+                <option value="">Select recipient...</option>
+                {eligibleReceivers.map(memberId => (
+                  <option key={memberId} value={memberId}>
+                    {membersMap[memberId]?.name || 'Unknown'}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Settle for Specific Expense Toggle */}

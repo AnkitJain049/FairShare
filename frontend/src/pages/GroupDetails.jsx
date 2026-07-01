@@ -915,6 +915,7 @@ export default function GroupDetails() {
         group={group}
         currentUser={currentUser}
         membersMap={membersMap}
+        prefilledPayerId={settlePayerId}
         prefilledReceiverId={settleReceiverId}
         prefilledAmount={settleAmount}
         prefilledExpenseId={settleExpenseId}
