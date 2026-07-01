@@ -13,10 +13,11 @@ FairShare is a premium, full-stack bill splitting and financial settlement web a
 | **[2. Prerequisites & Setup](#setup)** | • [Backend Setup](#backend-setup)<br>• [Frontend Setup](#frontend-setup) | System variables, local startup, and `.env` setups. |
 | **[3. Core Business Logic](#business-logic)** | • [Net Balance Formula](#balance-formula)<br>• [Splitting Strategies](#splitting-strategies)<br>• [Direct vs. Indirect](#direct-vs-indirect) | Splitting models (`EQUAL`, `EXACT`, `PERCENTAGE`) and ledger calculations. |
 | **[4. Simplification Algorithms](#simplification-algorithms)** | • [Greedy Simplification](#greedy-simplification)<br>• [DFS Cycle Elimination](#dfs-simplification) | Heuristics and backtracking optimization models to reduce cash flow. |
-| **[5. FIFO Ledger Matching](#fifo-ledger)** | • [Algorithm Mechanism](#fifo-mechanism)<br>• [Split State Diagram](#split-state-diagram) | Chronological matching for user payments against split liabilities. |
-| **[6. Settlement States & Flow](#settlement-logic)** | • [Manual Cash Rules](#manual-cash-rules)<br>• [Razorpay Checkout](#razorpay-flow) | Core transaction approval, verification states, and Razorpay signature math. |
-| **[7. End-to-End Workflows](#workflows)** | • [Registration](#workflow-a)<br>• [Groups Management](#workflow-b)<br>• [Expense Log](#workflow-c)<br>• [Razorpay Settle](#workflow-d)<br>• [Claim Approval](#workflow-e) | Full code traces from client events through controllers/services to database. |
-| **[8. API Route Registry](#api-routes)** | • Endpoints Reference Table | Structured reference table for all REST controllers. |
+| **[5. Database Schemas & Ledger Integrity](#database-schemas)** | • [Collections & Entities](#db-entities)<br>• [Lifecycle Rules](#ledger-rules) | Schema structure for users, groups, expenses, payments, and cascading integrity logic. |
+| **[6. FIFO Ledger Matching](#fifo-ledger)** | • [Algorithm Mechanism](#fifo-mechanism)<br>• [Split State Diagram](#split-state-diagram) | Chronological matching for user payments against split liabilities. |
+| **[7. Settlement States & Flow](#settlement-logic)** | • [Manual Cash Rules](#manual-cash-rules)<br>• [Razorpay Checkout](#razorpay-flow) | Core transaction approval, verification states, and Razorpay signature math. |
+| **[8. End-to-End Workflows](#workflows)** | • [Registration](#workflow-a)<br>• [Groups Management](#workflow-b)<br>• [Expense Log](#workflow-c)<br>• [Razorpay Settle](#workflow-d)<br>• [Claim Approval](#workflow-e) | Full code traces from client events through controllers/services to database. |
+| **[9. API Route Registry](#api-routes)** | • Endpoints Reference Table | Structured reference table for all REST controllers. |
 
 ---
 
@@ -151,6 +152,32 @@ Used to find the optimal cash flow paths by resolving cycles and minimizing tota
    * Subtract $M$ from every edge in the cycle.
    * Remove any edges whose weights drop to 0, breaking the circular dependency.
 4. **Backtracking Optimization:** The DFS engine recursively searches combinations to find the graph layout that minimizes both transaction count and transaction weights.
+
+---
+
+<a id="database-schemas"></a>
+## 📂 Database Schemas & Ledger Integrity
+
+FairShare structures its financial ledger using four primary MongoDB collections.
+
+<a id="db-entities"></a>
+### 1. Database Collections & Entities
+* **`users` (`User.java`):** Stores user identity data.
+  * Attributes: `id` (ObjectId), `name` (String), `email` (String), `phoneNumber` (String), `password` (String, BCrypt hashed).
+* **`groups` (`Group.java`):** Groups containing multiple members.
+  * Attributes: `id` (ObjectId), `name` (String), `type` (Enum: `HOME`, `TRIP`, `COUPLES`, `OTHER`), `memberIds` (List of ObjectIds).
+* **`expenses` (`Expense.java`):** Represents a purchase/payment event made by a member that is split among group members.
+  * Attributes: `id` (ObjectId), `groupId` (ObjectId), `description` (String), `totalAmount` (Double), `paidById` (ObjectId), `splitType` (Enum: `EQUAL`, `EXACT`, `PERCENTAGE`), `splitDetails` (List of `SplitDetail` DTOs: `userId`, `owedAmount`, `percentage`).
+* **`payments` (`Payment.java`):** Represents settlements between debtors and creditors.
+  * Attributes: `id` (ObjectId), `groupId` (ObjectId), `payerId` (ObjectId), `receiverId` (ObjectId), `amount` (Double), `paymentMethod` (Enum: `CASH`, `RAZORPAY`), `status` (Enum: `PENDING`, `AWAITING_APPROVAL`, `COMPLETED`, `REJECTED`), `razorpayOrderId` (String), `razorpayPaymentId` (String), `razorpaySignature` (String), `createdAt` (Date).
+
+<a id="ledger-rules"></a>
+### 2. Ledger Integrity & Lifecycle Rules
+To maintain the mathematical consistency of the balance sheets, the ledger implements strict consistency rules:
+* **Cascade Deletes:** Deleting an expense automatically triggers a database hook deleting all associated payment transactions. Deleting a group cascades to remove all associated expenses and payments.
+* **Credit Card Balance Sheet Mechanism:** Instead of updating static balances, net balances are computed dynamically on-demand from the complete event log of expenses and completed payments. This prevents state drifting.
+* **Double-Entry Booking Verification:** For every transaction, the debtor's balance is debited and the creditor's balance is credited by the exact same amount, guaranteeing that the sum of all balances in the group is always exactly 0:
+  $$\sum_{i=1}^{N} \text{Balance}_i = 0$$
 
 ---
 
